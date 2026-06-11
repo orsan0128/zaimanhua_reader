@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>再漫画 - 漫画阅读器</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="再漫画">
+    <meta name="theme-color" content="#16213e">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #ff6b35; --primary-dark: #e55a2b;
+      --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460;
+      --text: #eee; --text-muted: #aaa;
+      --card-bg: #222244; --border: #333;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+    }
+    .header {
+      background: var(--bg2); border-bottom: 2px solid var(--primary);
+      padding: 12px 20px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+    }
+    .header-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 16px; }
+    .logo { font-size: 22px; font-weight: 800; color: var(--primary); cursor: pointer; white-space: nowrap; }
+    .logo span { color: var(--text); }
+    .search-box { flex: 1; max-width: 500px; position: relative; }
+    .search-box input {
+      width: 100%; padding: 10px 44px 10px 16px;
+      border: 2px solid var(--border); border-radius: 24px;
+      background: var(--bg); color: var(--text); font-size: 14px; outline: none;
+    }
+    .search-box input:focus { border-color: var(--primary); }
+    .search-box input::placeholder { color: var(--text-muted); }
+    .search-btn {
+      position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+      background: var(--primary); border: none; color: white;
+      width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .back-btn {
+      background: var(--bg3); border: none; color: var(--text);
+      padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 14px;
+    }
+    .main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab {
+      padding: 8px 20px; border-radius: 20px; background: var(--card-bg);
+      border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; font-size: 14px;
+    }
+    .tab:hover { border-color: var(--primary); color: var(--text); }
+    .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .section-title {
+      font-size: 18px; font-weight: 700; margin-bottom: 16px;
+      padding-bottom: 8px; border-bottom: 2px solid var(--primary); display: inline-block;
+    }
+    .comic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; margin-bottom: 30px; }
+    .comic-card {
+      background: var(--card-bg); border-radius: 12px; overflow: hidden; cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s; border: 1px solid transparent;
+    }
+    .comic-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(255,107,53,0.2); border-color: var(--primary); }
+    .comic-cover { width: 100%; aspect-ratio: 3/4; object-fit: cover; background: var(--bg3); }
+    .comic-info { padding: 10px; }
+    .comic-title {
+      font-size: 13px; font-weight: 600; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px;
+    }
+    .comic-meta { font-size: 11px; color: var(--text-muted); }
+    .comic-status { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; background: var(--primary); color: white; }
+    .detail-header { display: flex; gap: 24px; margin-bottom: 24px; }
+    .detail-cover { width: 220px; flex-shrink: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+    .detail-cover img { width: 100%; aspect-ratio: 3/4; object-fit: cover; }
+    .detail-info { flex: 1; }
+    .detail-title { font-size: 28px; font-weight: 800; margin-bottom: 12px; color: var(--primary); }
+    .detail-meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .detail-meta-item { font-size: 14px; color: var(--text-muted); }
+    .detail-meta-item strong { color: var(--text); margin-right: 8px; }
+    .detail-desc { font-size: 14px; line-height: 1.6; color: var(--text-muted); margin-bottom: 16px; }
+    .detail-actions { display: flex; gap: 12px; }
+    .btn { padding: 10px 24px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+    .btn-outline:hover { background: var(--primary); color: white; }
+    .chapter-section { margin-top: 24px; }
+    .chapter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+    .chapter-btn {
+      padding: 10px 8px; border-radius: 8px; background: var(--card-bg);
+      border: 1px solid var(--border); color: var(--text); cursor: pointer; font-size: 13px; text-align: center;
+    }
+    .chapter-btn:hover { border-color: var(--primary); background: var(--bg3); }
+    /* Rank */
+    .rank-filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .rank-filters .filter-group { display: flex; gap: 4px; align-items: center; margin-right: 16px; }
+    .rank-filters .filter-label { font-size: 13px; color: var(--text-muted); margin-right: 4px; white-space: nowrap; }
+    .filter-btn {
+      padding: 4px 12px; border-radius: 12px; background: var(--card-bg);
+      border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; font-size: 12px;
+    }
+    .filter-btn:hover { border-color: var(--primary); color: var(--text); }
+    .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .rank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-bottom: 30px; }
+    .rank-item {
+      display: flex; gap: 12px; background: var(--card-bg); border-radius: 10px; padding: 12px;
+      cursor: pointer; transition: all 0.2s; border: 1px solid transparent; align-items: center;
+    }
+    .rank-item:hover { border-color: var(--primary); transform: translateX(4px); }
+    .rank-num { font-size: 22px; font-weight: 800; color: var(--primary); min-width: 36px; text-align: center; }
+    .rank-num.top3 { color: #ffd700; font-size: 26px; }
+    .rank-cover { width: 60px; height: 80px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+    .rank-info { flex: 1; min-width: 0; }
+    .rank-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rank-meta { font-size: 12px; color: var(--text-muted); }
+    .rank-score { font-size: 12px; color: var(--primary); font-weight: 600; margin-top: 4px; }
+    /* Reader - vertical scroll mode */
+    .reader { background: #000; min-height: 100vh; }
+    .reader-toolbar {
+      position: fixed; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.92);
+      padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
+      z-index: 200; transition: opacity 0.3s, transform 0.3s;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    }
+    .reader-toolbar.hidden { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+    .reader-toolbar .title { color: white; font-size: 15px; font-weight: 600; }
+    .reader-toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    .reader-btn {
+      background: var(--bg3); border: 1px solid var(--border); color: white;
+      padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    }
+    .reader-btn:hover { background: var(--primary); border-color: var(--primary); }
+    .reader-images { padding: 50px 0 80px; width: 100%; max-width: 800px; margin: 0 auto; }
+    .reader-img { width: 100%; display: block; margin: 0 auto; min-height: 200px; background: #111; }
+    .reader-img.lazy { opacity: 0; transition: opacity 0.3s; }
+    .reader-img.loaded { opacity: 1; }
+    /* Page slider bar */
+    .page-slider-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.92);
+      padding: 10px 20px 14px; z-index: 200; display: flex; align-items: center; gap: 12px;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .page-slider-bar.hidden { opacity: 0; transform: translateY(100%); pointer-events: none; }
+    .page-slider-bar .page-label { color: white; font-size: 13px; font-weight: 600; min-width: 70px; text-align: center; white-space: nowrap; }
+    .page-slider-bar input[type=range] {
+      flex: 1; height: 6px; -webkit-appearance: none; appearance: none;
+      background: #333; border-radius: 3px; outline: none; cursor: pointer;
+    }
+    .page-slider-bar input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%;
+      background: var(--primary); border: 2px solid #fff; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .page-slider-bar input[type=range]::-moz-range-thumb {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--primary); border: 2px solid #fff; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .page-slider-bar .chapter-nav-btn {
+      background: var(--bg3); border: 1px solid var(--border); color: white;
+      padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap;
+    }
+    .page-slider-bar .chapter-nav-btn:hover { background: var(--primary); border-color: var(--primary); }
+    .page-slider-bar .chapter-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--primary);
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 16px; }
+    @media (max-width: 768px) {
+      .detail-header { flex-direction: column; align-items: center; }
+      .detail-cover { width: 180px; }
+      .comic-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+      .chapter-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+      .rank-grid { grid-template-columns: 1fr; }
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-inner">
+      <div class="logo" onclick="goHome()">再漫画<span>阅读器</span></div>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索漫画..." onkeydown="if(event.key==='Enter') doSearch()">
+        <button class="search-btn" onclick="doSearch()">🔍</button>
+      </div>
+    </div>
+  </div>
+  <div class="main" id="app"></div>
+
+  <script>
+    const API = 'https://v4api.zaimanhua.com';
+    let state = { view: 'home', comic: null, chapters: [], currentChapter: null, images: [], page: 0, rank: { cate: 1, duration: 1, tag: 0, theme: 0 } };
+
+    async function api(path) {
+      const res = await fetch(API + path);
+      return res.json();
+    }
+    async function getComicDetail(comicPy) {
+      return api(`/api/v1/comic1/comic/detail?channel=pc&app_name=zmh&version=1.0.0&timestamp=${Date.now()}&comic_py=${comicPy}`);
+    }
+    async function getChapterDetail(chapterId, comicId) {
+      return api(`/api/v1/comic1/chapter/detail?chapter_id=${chapterId}&comic_id=${comicId}`);
+    }
+    async function searchComics(keyword) {
+      return api(`/app/v1/search/index?keyword=${encodeURIComponent(keyword)}`);
+    }
+    async function getUpdateList() {
+      return api('/api/v1/comic1/update_list?channel=pc&app_name=zmh&version=1.0.0&timestamp=' + Date.now());
+    }
+    async function filterComics(params) {
+      return api(`/api/v1/comic1/filter?${params}`);
+    }
+    async function getRankList(params) {
+      return api(`/api/v1/comic1/rank_list?channel=pc&app_name=zmh&version=1.0.0&timestamp=${Date.now()}&${params}`);
+    }
+
+    const $ = id => document.getElementById(id);
+    function render(html) { $('app').innerHTML = html; }
+    function showLoading(msg = '加载中...') { render(`<div class="loading"><div class="spinner"></div><p>${msg}</p></div>`); }
+    // 繁體→簡體轉換
+    const t2s = OpenCC.Converter({ from: 'tw', to: 'cn' });
+
+    function renderComicCard(c) {
+      const cover = c.cover || '';
+      const title = c.title || c.name || '未知';
+      const py = c.comic_py || '';
+      const authors = c.authors || '';
+      const status = c.status || '';
+      return `
+        <div class="comic-card" onclick="openComic('${py}')">
+          <img class="comic-cover" src="${cover}" alt="${title}" loading="lazy" onerror="this.style.background='#333'">
+          <div class="comic-info">
+            <div class="comic-title">${title}</div>
+            <div class="comic-meta">${authors} <span class="comic-status">${status}</span></div>
+          </div>
+        </div>`;
+    }
+
+    // ===== Navigation tabs (each tab has a UNIQUE id) =====
+    const NAV_TABS = [
+      { id: 'nav-home', label: '首页', action: 'goHome()' },
+      { id: 'nav-rank', label: '排行榜', action: 'showRank()' },
+      { id: 'nav-s', label: '少年', action: "showCategory('audience', 3262)" },
+      { id: 'nav-g', label: '少女', action: "showCategory('audience', 3263)" },
+      { id: 'nav-fun', label: '搞笑', action: "showCategory('theme', 2)" },
+      { id: 'nav-adv', label: '冒险', action: "showCategory('theme', 1)" },
+      { id: 'nav-fan', label: '奇幻', action: "showCategory('theme', 22)" },
+    ];
+
+    function renderTabs(activeId) {
+      return `<div class="tabs">${NAV_TABS.map(t =>
+        `<div class="tab ${t.id === activeId ? 'active' : ''}" onclick="${t.action}">${t.label}</div>`
+      ).join('')}</div>`;
+    }
+
+    // ===== Views =====
+    async function goHome() {
+      state.view = 'home'; state.comic = null;
+      showLoading('加载首页...');
+      try {
+        const res = await getUpdateList();
+        const list = res?.data?.list || [];
+        render(`${renderTabs('nav-home')}
+          <h2 class="section-title">🔥 最新更新</h2>
+          <div class="comic-grid">${list.slice(0, 24).map(renderComicCard).join('')}</div>`);
+      } catch (e) { render(`<div class="empty">加载失败: ${e.message}</div>`); }
+    }
+
+    // ===== Ranking =====
+    const RANK_CATE = { 1: '人氣', 2: '點擊', 3: '訂閱', 4: '評論', 5: '吐槽' };
+    const RANK_DURATION = { 1: '週', 2: '月', 3: '總' };
+    const RANK_TAG = { 0: '全部', 3262: '少年', 3263: '少女', 3264: '青年' };
+    const RANK_THEME = { 0: '全部', 1: '搞笑', 2: '科幻', 3: '魔法', 4: '熱血', 5: '冒險' };
+
+    async function showRank() {
+      state.view = 'rank';
+      showLoading('加载排行榜...');
+      try {
+        const r = state.rank;
+        const params = `page=1&size=50&duration=${r.duration}&cate=${r.cate}&tag=${r.tag}&theme=${r.theme}`;
+        const res = await getRankList(params);
+        const list = res?.data?.list || [];
+
+        const rankTitle = `${RANK_DURATION[r.duration]}${RANK_CATE[r.cate]}排行榜`;
+        const filterLabel = r.tag ? RANK_TAG[r.tag] : r.theme ? RANK_THEME[r.theme] : '全部';
+
+        render(`${renderTabs('nav-rank')}
+          <h2 class="section-title">🏆 ${rankTitle}</h2>
+
+          <div class="rank-filters">
+            <div class="filter-group">
+              <span class="filter-label">类型:</span>
+              ${Object.entries(RANK_CATE).map(([k,v]) => `<div class="filter-btn ${r.cate==k?'active':''}" onclick="setRank(${k}, null, null, null)">${v}</div>`).join('')}
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">时间:</span>
+              ${Object.entries(RANK_DURATION).map(([k,v]) => `<div class="filter-btn ${r.duration==k?'active':''}" onclick="setRank(null, ${k}, null, null)">${v}</div>`).join('')}
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">分类:</span>
+              ${Object.entries(RANK_TAG).map(([k,v]) => `<div class="filter-btn ${r.tag==k?'active':''}" onclick="setRank(null, null, ${k}, null)">${v}</div>`).join('')}
+              ${Object.entries(RANK_THEME).filter(([k])=>k!='0').map(([k,v]) => `<div class="filter-btn ${r.theme==k?'active':''}" onclick="setRank(null, null, null, ${k})">${v}</div>`).join('')}
+            </div>
+          </div>
+
+          <div class="rank-grid">${list.map((c, i) => `
+            <div class="rank-item" onclick="openComic('${c.comic_py}')">
+              <div class="rank-num ${i < 3 ? 'top3' : ''}">${i + 1}</div>
+              <img class="rank-cover" src="${c.cover}" alt="${c.title}" onerror="this.style.background='#333'">
+              <div class="rank-info">
+                <div class="rank-title">${c.title}</div>
+                <div class="rank-meta">${c.authors} · ${c.types}</div>
+                <div class="rank-score">🔥 ${c.num || 0} ${RANK_CATE[r.cate]}</div>
+              </div>
+            </div>
+          `).join('')}</div>`);
+      } catch (e) { render(`<div class="empty">加载失败: ${e.message}</div>`); }
+    }
+
+    function setRank(cate, duration, tag, theme) {
+      const r = state.rank;
+      if (cate !== null) r.cate = cate;
+      if (duration !== null) r.duration = duration;
+      // tag and theme are mutually exclusive: selecting one resets the other
+      if (tag !== null) { r.tag = tag; r.theme = 0; }
+      if (theme !== null) { r.theme = theme; r.tag = 0; }
+      showRank();
+    }
+
+    async function showCategory(key, val) {
+      state.view = 'category';
+      showLoading('加载中...');
+      try {
+        let params = '';
+        if (key === 'audience') params = `audience=${val}`;
+        else if (key === 'theme') params = `theme=${val}`;
+        else return goHome();
+        const res = await filterComics(params);
+        const comics = res?.data?.comicList || [];
+        const activeId = key === 'audience' ? (val === 3262 ? 'nav-s' : 'nav-g') : (val === 2 ? 'nav-fun' : val === 1 ? 'nav-adv' : 'nav-fan');
+        const navTab = NAV_TABS.find(t => t.id === activeId);
+        render(`${renderTabs(activeId)}
+          <h2 class="section-title">📂 ${navTab ? navTab.label : val}</h2>
+          ${comics.length ? `<div class="comic-grid">${comics.map(renderComicCard).join('')}</div>` : '<div class="empty">没有找到相关漫画</div>'}`);
+      } catch (e) { render(`<div class="empty">加载失败: ${e.message}</div>`); }
+    }
+
+    async function doSearch() {
+      const keyword = $('searchInput').value.trim();
+      if (!keyword) return;
+      const query = t2s(keyword);
+      state.view = 'search';
+      showLoading(`搜索「${keyword}」...`);
+      try {
+        const res = await searchComics(query);
+        const comics = res?.data?.list || [];
+        render(`<h2 class="section-title">🔍 搜索: ${keyword}</h2>
+          ${comics.length ? `<div class="comic-grid">${comics.map(renderComicCard).join('')}</div>` : '<div class="empty">没有找到相关漫画</div>'}`);
+      } catch (e) { render(`<div class="empty">搜索失败: ${e.message}</div>`); }
+    }
+
+    async function openComic(comicPy) {
+      if (!comicPy) return;
+      state.view = 'detail';
+      showLoading('加载漫画详情...');
+      try {
+        const res = await getComicDetail(comicPy);
+        const comic = res?.data?.comicInfo;
+        if (!comic) throw new Error('漫画不存在');
+        state.comic = comic;
+        state.chapters = comic.chapterList || [];
+        const allCh = [];
+        state.chapters.forEach(g => (g.data || []).forEach(c => allCh.push(c)));
+        render(`
+          <button class="back-btn" onclick="goHome()" style="margin-bottom:16px">← 返回首页</button>
+          <div class="detail-header">
+            <div class="detail-cover"><img src="${comic.cover || ''}" alt="${comic.title}"></div>
+            <div class="detail-info">
+              <h1 class="detail-title">${comic.title}</h1>
+              <div class="detail-meta">
+                <div class="detail-meta-item"><strong>作者</strong>${comic.authorInfo?.authorName || '未知'}</div>
+                <div class="detail-meta-item"><strong>状态</strong>${comic.status}</div>
+                <div class="detail-meta-item"><strong>分类</strong>${comic.types}</div>
+                <div class="detail-meta-item"><strong>最新话</strong>${comic.lastUpdateChapterName}</div>
+              </div>
+              <p class="detail-desc">${comic.description || '暂无简介'}</p>
+              <div class="detail-actions">
+                ${allCh.length ? `<button class="btn btn-primary" onclick="readChapter(${comic.id}, ${allCh[allCh.length-1]?.chapter_id || 0})">📖 开始阅读</button>` : ''}
+                <button class="btn btn-outline" onclick="goHome()">← 返回首页</button>
+              </div>
+            </div>
+          </div>
+          <div class="chapter-section">
+            <h2 class="section-title">📚 章节列表 (${allCh.length}话)</h2>
+            <div class="chapter-grid">${allCh.map(c =>
+              `<div class="chapter-btn" onclick="readChapter(${comic.id}, ${c.chapter_id})">${c.chapter_title}</div>`
+            ).join('')}</div>
+          </div>`);
+      } catch (e) { render(`<div class="empty">加载失败: ${e.message}</div>`); }
+    }
+
+    async function readChapter(comicId, chapterId) {
+      if (!chapterId) return;
+      state.view = 'reader';
+      showLoading('加载章节图片...');
+      try {
+        const res = await getChapterDetail(chapterId, comicId);
+        const info = res?.data?.chapterInfo;
+        if (!info) throw new Error('章节不存在');
+        state.currentChapter = info;
+        state.images = info.page_url || [];
+        state.page = 0;
+        state.comicId = comicId;
+        renderReader();
+      } catch (e) { render(`<div class="empty">加载失败: ${e.message}</div>`); }
+    }
+
+    let scrollObserver = null;
+    let uiHideTimer = null;
+
+    function renderReader() {
+      const { currentChapter: ch, images } = state;
+      document.body.style.background = '#000';
+
+      // Get prev/next chapter info
+      const allCh = []; state.chapters.forEach(g => (g.data || []).forEach(c => allCh.push(c)));
+      const curIdx = allCh.findIndex(c => c.chapter_id === ch.chapter_id);
+      // Array is newest→oldest, so prev(上一話)=older(idx+1), next(下一話)=newer(idx-1)
+      const prevCh = curIdx < allCh.length - 1 ? allCh[curIdx + 1] : null;
+      const nextCh = curIdx > 0 ? allCh[curIdx - 1] : null;
+      state.prevChapter = prevCh;
+      state.nextChapter = nextCh;
+
+      // Build all images HTML with lazy loading placeholders
+      const imgsHtml = images.map((url, i) =>
+        `<img class="reader-img lazy" data-index="${i}" data-src="${url}" alt="第${i+1}页" loading="lazy">`
+      ).join('');
+
+      render(`<div class="reader">
+        <div class="reader-toolbar" id="toolbar" onclick="toggleReaderUI()">
+          <button class="reader-btn" onclick="event.stopPropagation(); closeReader()">✕ 关闭</button>
+          <span class="title" id="readerTitle">${ch.title} (1/${images.length})</span>
+          <div class="controls">
+            <button class="reader-btn" onclick="event.stopPropagation(); prevImg()" ${prevCh ? '' : 'disabled style="opacity:0.3"'}>◀ 上一话</button>
+            <button class="reader-btn" onclick="event.stopPropagation(); nextImg()" ${nextCh ? '' : 'disabled style="opacity:0.3"'}>下一话 ▶</button>
+          </div>
+        </div>
+        <div class="reader-images" id="readerScroll">${imgsHtml}</div>
+        <div class="page-slider-bar" id="sliderBar">
+          <button class="chapter-nav-btn" onclick="event.stopPropagation(); prevImg()" ${prevCh ? '' : 'disabled'}>◀ 上一话</button>
+          <span class="page-label" id="pageLabel">1 / ${images.length}</span>
+          <input type="range" id="pageSlider" min="1" max="${images.length}" value="1"
+            oninput="onSliderDrag(this.value)" onchange="onSliderRelease(this.value)">
+          <button class="chapter-nav-btn" onclick="event.stopPropagation(); nextImg()" ${nextCh ? '' : 'disabled'}>下一话 ▶</button>
+        </div>
+      </div>`);
+
+      // Setup lazy loading with IntersectionObserver
+      setupLazyLoad();
+      // Setup scroll-based page tracking
+      setupScrollTracking();
+      // Auto-show UI briefly
+      showReaderUI();
+    }
+
+    function setupLazyLoad() {
+      const imgs = document.querySelectorAll('.reader-img.lazy');
+      const loadObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            img.src = img.dataset.src;
+            img.onload = () => img.classList.add('loaded');
+            img.onerror = () => { img.style.background = '#333'; img.classList.add('loaded'); };
+            loadObserver.unobserve(img);
+          }
+        });
+      }, { rootMargin: '500px' }); // Load 500px ahead
+      imgs.forEach(img => loadObserver.observe(img));
+    }
+
+    function setupScrollTracking() {
+      if (scrollObserver) scrollObserver.disconnect();
+      const imgs = document.querySelectorAll('.reader-img');
+      scrollObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.3) {
+            const idx = parseInt(entry.target.dataset.index);
+            if (!isNaN(idx)) {
+              state.currentPageIdx = idx;
+              updatePageDisplay(idx);
+            }
+          }
+        });
+      }, { threshold: 0.3 });
+      imgs.forEach(img => scrollObserver.observe(img));
+    }
+
+    function updatePageDisplay(idx) {
+      const total = state.images.length;
+      const label = $('pageLabel');
+      const title = $('readerTitle');
+      const slider = $('pageSlider');
+      if (label) label.textContent = `${idx + 1} / ${total}`;
+      if (title) title.textContent = `${state.currentChapter.title} (${idx + 1}/${total})`;
+      // Don't update slider while user is dragging
+      if (slider && !state.sliderDragging) slider.value = idx + 1;
+    }
+
+    function onSliderDrag(val) {
+      state.sliderDragging = true;
+      const idx = parseInt(val) - 1;
+      const label = $('pageLabel');
+      if (label) label.textContent = `${idx + 1} / ${state.images.length}`;
+    }
+
+    function onSliderRelease(val) {
+      state.sliderDragging = false;
+      scrollToPage(parseInt(val) - 1);
+    }
+
+    function scrollToPage(idx) {
+      const img = document.querySelector(`.reader-img[data-index="${idx}"]`);
+      if (img) {
+        const toolbarH = 50;
+        const y = img.getBoundingClientRect().top + window.pageYOffset - toolbarH;
+        window.scrollTo({ top: y, behavior: 'smooth' });
+      }
+    }
+
+    function toggleReaderUI() {
+      const toolbar = $('toolbar');
+      const slider = $('sliderBar');
+      if (!toolbar) return;
+      const isHidden = toolbar.classList.contains('hidden');
+      if (isHidden) {
+        showReaderUI();
+      } else {
+        hideReaderUI();
+      }
+    }
+
+    function showReaderUI() {
+      clearTimeout(uiHideTimer);
+      const toolbar = $('toolbar');
+      const slider = $('sliderBar');
+      if (toolbar) toolbar.classList.remove('hidden');
+      if (slider) slider.classList.remove('hidden');
+      // Auto-hide after 3 seconds
+      uiHideTimer = setTimeout(hideReaderUI, 3000);
+    }
+
+    function hideReaderUI() {
+      const toolbar = $('toolbar');
+      const slider = $('sliderBar');
+      if (toolbar) toolbar.classList.add('hidden');
+      if (slider) slider.classList.add('hidden');
+    }
+
+    // Show UI on any touch/click in reader area
+    document.addEventListener('touchstart', () => {
+      if (state.view === 'reader') showReaderUI();
+    }, { passive: true });
+
+    function nextImg() {
+      if (state.nextChapter) readChapter(state.comicId, state.nextChapter.chapter_id);
+    }
+    function prevImg() {
+      if (state.prevChapter) readChapter(state.comicId, state.prevChapter.chapter_id);
+    }
+    function closeReader() {
+      document.body.style.background = '';
+      if (scrollObserver) { scrollObserver.disconnect(); scrollObserver = null; }
+      clearTimeout(uiHideTimer);
+      if (state.comic) openComic(state.comic.comicPy); else goHome();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (state.view !== 'reader') return;
+      if (e.key === 'Escape') closeReader();
+      if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); window.scrollBy(0, window.innerHeight * 0.8); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); window.scrollBy(0, -window.innerHeight * 0.8); }
+    });
+
+    goHome();
+  </script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+<script>
+// Image loading handled by Android shouldInterceptRequest — no JS proxy needed
+</script>
+</body>
+</html>

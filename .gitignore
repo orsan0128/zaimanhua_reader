@@ -1,0 +1,9 @@
+# Build outputs
+android/app/build/
+android/build/
+android/gradle/
+android/.gradle/
+*.apk
+
+# OS files
+.DS_Store
